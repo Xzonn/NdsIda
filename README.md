@@ -1,3 +1,5 @@
+### This project is not maintained anymore.
+
 # nds.py
 
 Nintendo DS ROM tools for IDA Pro 7.6+. Requires [Python 3.10](https://www.python.org/downloads/release/python-3100/) or greater.
