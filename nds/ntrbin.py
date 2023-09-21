@@ -103,8 +103,8 @@ class NTRBIN:
 
     def _validate(self, li):
         # Check ARM9 values
-        if self._arm9_offset < 0x4000:
-            return False
+        # if self._arm9_offset < 0x4000:
+            # return False
         if self._arm9_vaddr != layout_arm9.CODE_BASE:
             return False
         if self._arm9_ep < self._arm9_vaddr:
