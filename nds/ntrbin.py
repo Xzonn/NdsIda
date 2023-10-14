@@ -17,6 +17,11 @@ ARM7_EP = 0x34
 ARM7_VADDR = 0x38
 ARM7_SIZE = 0x3C
 
+FAT_OFFSET = 0x48
+FAT_SIZE = 0x4C
+OV9_OFFSET = 0x50
+OV9_SIZE = 0x54
+
 CRC_TABLE = [
     0x0000, 0xC0C1, 0xC181, 0x0140, 0xC301, 0x03C0, 0x0280, 0xC241,
 	0xC601, 0x06C0, 0x0780, 0xC741, 0x0500, 0xC5C1, 0xC481, 0x0440,
@@ -59,7 +64,38 @@ def _read_dword(li, off):
         raise Exception("Invalid binary")
     return struct.unpack('<I', s)[0]
 
+class Overlay9Item:
+    ram_address: int = 0
+    ram_size: int = 0
+    binary: bytes = b''
+
+    def __init__(self, ram_address: int, ram_size: int, binary: bytes):
+        self.ram_address = ram_address
+        self.ram_size = ram_size
+        self.binary = binary
+
+class FATItem:
+    offset: int = 0
+    size: int = 0
+
+    def __init__(self, id: int, offset: int, size: int):
+        self.offset = offset
+        self.size = size
+
 class NTRBIN:
+    _arm9_offset: int
+    _arm9_ep: int
+    _arm9_vaddr: int
+    _arm9_size: int
+
+    _arm7_offset: int
+    _arm7_ep: int
+    _arm7_vaddr: int
+    _arm7_size: int
+
+    _ov9_list: list = []
+    _ov9_current: Overlay9Item
+
     def _read_header(self, li):
         li.seek(0)
         self._header = li.read(0x160)
@@ -139,7 +175,28 @@ class NTRBIN:
         self._arm7_ep = _read_dword(li, ARM7_EP)
         self._arm7_vaddr = _read_dword(li, ARM7_VADDR)
         self._arm7_size = _read_dword(li, ARM7_SIZE)
-            
+
+        # Read ARM9 Overlay values
+        fat_offset = _read_dword(li, FAT_OFFSET)
+        fat_size = _read_dword(li, FAT_SIZE)
+        li.seek(fat_offset)
+        fat_table_binary = li.read(fat_size)
+
+        ov9_offset = _read_dword(li, OV9_OFFSET)
+        ov9_size = _read_dword(li, OV9_SIZE)
+        li.seek(ov9_offset)
+        ov9_table_binary = li.read(ov9_size)
+
+        for i in range(0, ov9_size, 0x20):
+            overlay_id, ram_address, ram_size, bss_size, static_initialiser_start_address, static_initialiser_end_address, file_id, reserved = struct.unpack('<8I', ov9_table_binary[i:i+0x20])
+            file_offset, file_end = struct.unpack('<2I', fat_table_binary[file_id * 8:file_id * 8 + 8])
+            li.seek(file_offset)
+            ov9_binary = li.read(file_end - file_offset)
+            self._ov9_list.append(Overlay9Item(ram_address, ram_size, ov9_binary))
+
+        if len(self._ov9_list) > 0:
+            self._ov9_current = self._ov9_list[0]
+
         return self._validate(li)
 
     def get_sec_checksum(self):
@@ -168,3 +225,12 @@ class NTRBIN:
 
     def get_arm9_binary(self):
         return self._arm9_binary
+
+    def has_ov9(self):
+        return len(self._ov9_list) > 0
+
+    def get_ov9_vaddr(self, ov9_id: int) -> int:
+        return self._ov9_list[ov9_id].ram_address
+
+    def get_ov9_binary(self, ov9_id: int) -> bytes:
+        return self._ov9_list[ov9_id].binary

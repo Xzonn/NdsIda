@@ -14,7 +14,7 @@ call_count = 0
 
 def accept_file_impl(li, filename):
     global call_count
-    if call_count == 0:
+    if call_count % 2 == 0:
         if bininfo.parse(li):
             call_count += 1
             return { 
@@ -24,7 +24,7 @@ def accept_file_impl(li, filename):
                 }
 
     # We dont need to parse this time
-    if call_count == 1:
+    if call_count % 2 == 1:
         call_count += 1
         return {
             "format": misc.ARM7_FORMAT,
@@ -40,6 +40,10 @@ def load_arm9():
 
      # Fill sections
     ida_bytes.put_bytes(bininfo.get_arm9_vaddr(), bininfo.get_arm9_binary())
+    if bininfo.has_ov9():
+        ida_bytes.put_bytes(bininfo.get_ov9_vaddr(0), bininfo.get_ov9_binary(0))
+        misc.add_line(bininfo.get_ov9_vaddr(0), "Overlay starts here")
+
     ida_bytes.put_bytes(layout_arm9.HEADER_BASE, bininfo.get_hdr_binary())
 
     # Set entrypoint
